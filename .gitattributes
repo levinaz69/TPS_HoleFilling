@@ -1,6 +1,7 @@
+*.ply -diff
+*.obj -diff
 *.tga -diff
-*.vbm -diff
 *.png -diff
 *.dds -diff
-*.BMP -diff
-*.raw -diff
+*.bmp -diff
+*.jpg -diff

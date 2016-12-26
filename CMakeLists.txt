@@ -1,32 +1,42 @@
-cmake_minimum_required(VERSION 2.8.8)
-if(POLICY CMP0020)
-  cmake_policy(SET CMP0020 NEW)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
+IF(POLICY CMP0020)
+  CMAKE_POLICY(SET CMP0020 NEW)
+ENDIF()
+
+
+# guard against in-source builds
+if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+  MESSAGE(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
 endif()
 
 PROJECT(TPS_HoleFilling)
 
-# guard against in-source builds
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
-  message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
-endif()
+FIND_PACKAGE(VTK REQUIRED)
 
-# if(WIN32)
-  # set(ENV{PATH} ${VTK_DIR};$ENV{PATH})
-# endif()
+INCLUDE(${VTK_USE_FILE})
 
-#set(CMAKE_CXX_STANDARD 11)
+# IF(WIN32)
+  # SET(ENV{PATH} ${VTK_DIR};$ENV{PATH})
+# ENDIF()
 
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
+#SET(CMAKE_CXX_STANDARD 11)
 
+INCLUDE_DIRECTORIES(include)
+SET(source_files 
+	src/TPS_HoleFilling.cpp
+	src/PickingInteractorStyle.cpp
+	src/PickingWindow.cpp
+	)
+SET(include_files
+	include/common.h
+	src/PickingInteractorStyle.h
+	src/PickingWindow.h
+	)
 
-#set(SOURCE_FILES main.cpp)
-#add_executable(TPS_HoleFilling ${SOURCE_FILES})
+ADD_EXECUTABLE(TPS_HoleFilling MACOSX_BUNDLE ${source_files} ${include_files})
 
-add_executable(TPS_HoleFilling MACOSX_BUNDLE src/TPS_HoleFilling.cpp)
-
-if(VTK_LIBRARIES)
-  target_link_libraries(TPS_HoleFilling ${VTK_LIBRARIES})
-else()
-  target_link_libraries(TPS_HoleFilling vtkHybrid vtkWidgets)
-endif()
+IF(VTK_LIBRARIES)
+  TARGET_LINK_LIBRARIES(TPS_HoleFilling ${VTK_LIBRARIES})
+ELSE()
+  TARGET_LINK_LIBRARIES(TPS_HoleFilling vtkHybrid vtkWidgets)
+ENDIF()
