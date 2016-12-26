@@ -49,7 +49,6 @@ public:
 		// Get the keypress
 		std::string key = this->GetInteractor()->GetKeySym();
 
-
 		// Handle a key
 		// Enter different OPERATING_MODE according to the key
 		if (key == "z")

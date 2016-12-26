@@ -1,22 +1,32 @@
 #pragma once
 
-#include <vtkPolyData.h>
-#include <vtkPLYReader.h>
 #include <vtkSmartPointer.h>
+#include <vtkPLYReader.h>
+#include <vtkPLYWriter.h>
+
+#include <vtkPolyData.h>
+#include <vtkSphereSource.h>
 #include <vtkPolyDataMapper.h>
+
 #include <vtkActor.h>
 #include <vtkActorCollection.h>
 #include <vtkCollectionIterator.h>
 
+#include <vtkTextActor.h>
+#include <vtkTextProperty.h>
+//#include <vtkLabeledDataMapper.h>
+
 #include <vtkRenderWindow.h>
 #include <vtkRenderer.h>
 #include <vtkRenderWindowInteractor.h>
-
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPropPicker.h>
 #include <vtkProperty.h>
-#include <vtkSphereSource.h>
 
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <vector>
 #include <sstream>
 #include <vector>
 #include <functional>
