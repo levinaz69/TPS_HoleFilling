@@ -2,6 +2,8 @@
 #include "common.h"
 #include "PickingInteractorStyle.h"
 
+#define NULL_MARKER_INDEX -1
+
 class PickingInteractorStyle;
 
 class PickingWindow
@@ -21,26 +23,38 @@ public:
 	void SetMarkerSize(double size);
 	void PickingCallback(const int* clickPos);
 	void SetOperaringMode(const OPERATING_MODE mode);
+	int GetMarkerIndex(vtkSmartPointer<vtkActor> actor);
 	//protected:
 public:
-	
+	// Model
 	vtkSmartPointer<vtkPLYReader> PLYReader;
 	vtkSmartPointer<vtkPolyDataMapper> ModelMapper;
 	vtkSmartPointer<vtkActor> ModelActor;
-	vtkSmartPointer<vtkActorCollection> ModelActorList;
+	vtkSmartPointer<vtkActorCollection> ModelActorCollection;
+	// Marker
+	vtkSmartPointer<vtkSphereSource> MarkerSphereSource;
+	vtkSmartPointer<vtkPolyDataMapper> MarkerSphereMapper;
 
-	vtkSmartPointer<vtkSphereSource> MarkerSource;
-	vtkSmartPointer<vtkPolyDataMapper> MarkerMapper;
-	vtkSmartPointer<vtkActorCollection> MarkerActorList;
-	vtkSmartPointer<vtkActor> CurrentMarkerActor;
+	int CurrentMarkerIndex;
+	std::vector< vtkSmartPointer<vtkActor> > MarkerActors;	// position
+	vtkSmartPointer<vtkActorCollection> MarkerActorCollection;
 
+	vtkSmartPointer<vtkPoints> MarkerPoints;	// position
+	vtkSmartPointer<vtkPolyData> MarkerPointPolyData;
+	vtkSmartPointer<vtkLabeledDataMapper> MarkerLabelMapper;
+	vtkSmartPointer<vtkActor2D> MarkerLabelActor;
+	// Render
 	vtkSmartPointer<vtkRenderer> Renderer;
 	vtkSmartPointer<vtkRenderWindow> RenderWindow;
 	vtkSmartPointer<vtkRenderWindowInteractor> RenderWindowInteractor;
 	vtkSmartPointer<PickingInteractorStyle> InteractorStyle;
+	// Others
+	vtkSmartPointer<vtkTextActor> ModeIndicatorActor;
 
 	void CreateMarker(double* pos);
+	void SetCurrentMarker(int index);
 	void SetCurrentMarker(vtkSmartPointer<vtkActor> actor);
+	void MoveCurrentMarker(double x, double y, double z);
 	void RemoveCurrentMarker();
 };
 

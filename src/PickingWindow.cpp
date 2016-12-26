@@ -1,20 +1,34 @@
 ﻿#include "PickingWindow.h"
 
+
+
 void PickingWindow::Initialize()
 {
 	// Model
 	PLYReader = vtkSmartPointer<vtkPLYReader>::New();
 	ModelMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
 	ModelActor = vtkSmartPointer<vtkActor>::New();
-	ModelActorList = vtkSmartPointer<vtkActorCollection>::New();
+	ModelActorCollection = vtkSmartPointer<vtkActorCollection>::New();
 
 	// Marker
-	MarkerSource = vtkSmartPointer<vtkSphereSource>::New();
-	MarkerSource->SetCenter(0, 0, 0);
-	MarkerSource->SetRadius(0.02);		// default marker size
-	MarkerMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	MarkerMapper->SetInputConnection(MarkerSource->GetOutputPort());
-	MarkerActorList = vtkSmartPointer<vtkActorCollection>::New();
+	MarkerSphereSource = vtkSmartPointer<vtkSphereSource>::New();
+	MarkerSphereSource->SetCenter(0, 0, 0);
+	MarkerSphereSource->SetRadius(0.02);		// default marker size
+	MarkerSphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	MarkerSphereMapper->SetInputConnection(MarkerSphereSource->GetOutputPort());
+	MarkerActorCollection = vtkSmartPointer<vtkActorCollection>::New();
+	CurrentMarkerIndex = NULL_MARKER_INDEX;
+
+	// Marker Labels
+	MarkerPoints = vtkSmartPointer<vtkPoints>::New();
+	MarkerLabelMapper = vtkSmartPointer<vtkLabeledDataMapper>::New();
+	MarkerPointPolyData = vtkSmartPointer<vtkPolyData>::New();
+	MarkerPointPolyData->SetPoints(MarkerPoints);
+	MarkerLabelMapper->SetInputData(MarkerPointPolyData);
+
+	MarkerLabelActor = vtkSmartPointer<vtkActor2D>::New();
+	MarkerLabelActor->SetMapper(MarkerLabelMapper);
+	Renderer->AddActor(MarkerLabelActor);
 
 	// Renderer
 	Renderer = vtkSmartPointer<vtkRenderer>::New();
@@ -29,6 +43,14 @@ void PickingWindow::Initialize()
 	RenderWindowInteractor->SetRenderWindow(RenderWindow);
 	SetInteractorStyle();
 	
+	// Setup OperatingMode and its indicator
+	ModeIndicatorActor = vtkSmartPointer<vtkTextActor>::New();
+	ModeIndicatorActor->SetPosition2(10, 40);
+	ModeIndicatorActor->GetTextProperty()->SetFontSize(16);
+	ModeIndicatorActor->GetTextProperty()->SetColor(1.0, 1.0, 1.0);
+	Renderer->AddActor2D(ModeIndicatorActor);
+	SetOperaringMode(CREATE_MODE);
+
 }
 
 void PickingWindow::LoadPLY(const std::string inputFilename)
@@ -36,7 +58,7 @@ void PickingWindow::LoadPLY(const std::string inputFilename)
 	PLYReader->SetFileName(inputFilename.c_str());
 	ModelMapper->SetInputConnection(PLYReader->GetOutputPort());
 	ModelActor->SetMapper(ModelMapper);
-	ModelActorList->AddItem(ModelActor);
+	ModelActorCollection->AddItem(ModelActor);
 	Renderer->AddActor(ModelActor);
 
 	Renderer->ResetCamera();
@@ -56,9 +78,12 @@ void PickingWindow::SetInteractorStyle()
 {
 	InteractorStyle = vtkSmartPointer<PickingInteractorStyle>::New();
 	// Set callback functions
-	InteractorStyle->SetPickingCallback(std::bind(&PickingWindow::PickingCallback, this, std::placeholders::_1));
-	InteractorStyle->SetModeSelectingCallback(std::bind(&PickingWindow::SetOperaringMode, this, std::placeholders::_1));
-	InteractorStyle->SetRemoveCurrentMarkerCallback(std::bind(&PickingWindow::RemoveCurrentMarker, this));
+	InteractorStyle->SetPickingCallback(
+		std::bind(&PickingWindow::PickingCallback, this, std::placeholders::_1) );
+	InteractorStyle->SetModeSelectingCallback(
+		std::bind(&PickingWindow::SetOperaringMode, this, std::placeholders::_1) );
+	InteractorStyle->SetRemoveCurrentMarkerCallback(
+		std::bind(&PickingWindow::RemoveCurrentMarker, this) );
 
 	InteractorStyle->SetDefaultRenderer(Renderer);
 	RenderWindowInteractor->SetInteractorStyle(InteractorStyle);
@@ -66,7 +91,7 @@ void PickingWindow::SetInteractorStyle()
 
 void PickingWindow::SetMarkerSize(double size)
 {
-	MarkerSource->SetRadius(size);
+	MarkerSphereSource->SetRadius(size);
 }
 
 void PickingWindow::PickingCallback(const int* clickPos)
@@ -74,7 +99,8 @@ void PickingWindow::PickingCallback(const int* clickPos)
 	// Pick from this location.
 
 	auto picker = vtkSmartPointer<vtkPropPicker>::New();
-	picker->PickProp(clickPos[0], clickPos[1], Renderer, OperatingMode == SELECT_MODE ? MarkerActorList : ModelActorList);
+	picker->PickProp(clickPos[0], clickPos[1], Renderer, 
+		OperatingMode == SELECT_MODE ? MarkerActorCollection : ModelActorCollection);
 
 	double* picked_pos = picker->GetPickPosition();
 	vtkActor* picked_actor = picker->GetActor();
@@ -102,7 +128,7 @@ void PickingWindow::PickingCallback(const int* clickPos)
 		}
 		else if (OperatingMode == MOVE_MODE)
 		{
-			CurrentMarkerActor->SetPosition(picked_pos[0], picked_pos[1], picked_pos[2]);
+			MoveCurrentMarker(picked_pos[0], picked_pos[1], picked_pos[2]);
 		}
 	}
 
@@ -113,111 +139,138 @@ void PickingWindow::SetOperaringMode(const OPERATING_MODE mode)
 	if (mode == SELECT_MODE)
 	{
 		OperatingMode = SELECT_MODE;
+		ModeIndicatorActor->SetInput("Select");
 	}
 	else if (mode == CREATE_MODE)
 	{
 		OperatingMode = CREATE_MODE;
+		ModeIndicatorActor->SetInput("Add");
 	}
 	else if (mode == MOVE_MODE)
 	{
 		OperatingMode = MOVE_MODE;
+		ModeIndicatorActor->SetInput("Move");
 	}
+	this->Render();
 #if _DEBUG
 	std::cout << "Set Current mode to " << this->OperatingMode << std::endl;
 #endif
 }
 
+int PickingWindow::GetMarkerIndex(const vtkSmartPointer<vtkActor> actor)
+{
+	if (actor != nullptr)
+	{
+		int idx;
+		for (idx = 0; idx < MarkerActors.size(); idx++)
+		{
+			if (MarkerActors[idx] == actor)
+				return idx;
+		}
+	}
+	return NULL_MARKER_INDEX;
+}
+
 void PickingWindow::CreateMarker(double* pos)
 {
 	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-	actor->SetMapper(MarkerMapper);
+	actor->SetMapper(MarkerSphereMapper);
 	actor->SetPosition(pos[0], pos[1], pos[2]);
 
-	SetCurrentMarker(actor);
-	//actor->GetProperty()->SetColor(color[0], color[1], color[2]);
-	//actor->PickableOff();
+	//Add actor to list
+	MarkerActorCollection->AddItem(actor);
+	MarkerActors.push_back(actor);
+	int idx = MarkerActors.size() - 1;
+	SetCurrentMarker(idx);
 
-	//Add actor to renderer and list
-	MarkerActorList->AddItem(actor);
+	//Add point to list
+	MarkerPoints->InsertNextPoint(pos);
+
+	//Add actor to renderer
 	Renderer->AddActor(actor);
-	RenderWindow->Render();
+	this->Render();
+
 #ifdef _DEBUG
-	std::cout << "Current marker #:" << MarkerActorList->GetNumberOfItems() << std::endl;
+	std::cout << "Current marker #:" << idx << std::endl;
 #endif
 
+}
+
+void PickingWindow::SetCurrentMarker(int index)
+{
+	if (index == NULL_MARKER_INDEX)
+		return;
+
+	if (CurrentMarkerIndex != NULL_MARKER_INDEX)
+	{
+		auto& currentMarkerActor = MarkerActors[CurrentMarkerIndex];
+		currentMarkerActor->GetProperty()->
+			SetColor(MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2]);
+	}
+	CurrentMarkerIndex = index;
+	MarkerActors[CurrentMarkerIndex]->GetProperty()->
+		SetColor(MARKER_COLOR_SELECTED[0], MARKER_COLOR_SELECTED[1], MARKER_COLOR_SELECTED[2]);
+
+#ifdef _DEBUG
+	std::cout << "Current actor: " << MarkerActors[index].GetPointer() << std::endl;
+#endif
 }
 
 void PickingWindow::SetCurrentMarker(vtkSmartPointer<vtkActor> actor)
 {
-	if (actor == nullptr) 
-		return;
-
-	if (CurrentMarkerActor.Get() != nullptr)
-	{
-		CurrentMarkerActor->GetProperty()->SetColor(MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2]);
-	}
-	actor->GetProperty()->SetColor(MARKER_COLOR_SELECTED[0], MARKER_COLOR_SELECTED[1], MARKER_COLOR_SELECTED[2]);
-	CurrentMarkerActor = actor;
-#ifdef _DEBUG
-	std::cout << "Current actor: " << CurrentMarkerActor.GetPointer() << std::endl;
-#endif
+	SetCurrentMarker(GetMarkerIndex(actor));
 }
+
+void PickingWindow::MoveCurrentMarker(double x, double y, double z)
+{
+	if (CurrentMarkerIndex != NULL_MARKER_INDEX)
+	{
+		MarkerActors[CurrentMarkerIndex]->SetPosition(x, y, z);
+		MarkerPoints->SetPoint(CurrentMarkerIndex, x, y, z);
+	}
+}
+
 
 void PickingWindow::RemoveCurrentMarker()
 {
-	auto& actor = CurrentMarkerActor;
-	if (actor != nullptr)
+	// TODO
+	if (CurrentMarkerIndex != NULL_MARKER_INDEX)
 	{
-		//int idx = MarkerActorList->IsItemPresent(actor);
-		//if (idx != 0)
-		//{
-		//	idx -= 1;
-		//	std::cout << idx << std::endl;
+		auto& currentMarkerActor = MarkerActors[CurrentMarkerIndex];
+		MarkerActorCollection->RemoveItem(CurrentMarkerIndex);
+		MarkerActors.erase();
+		Renderer->RemoveActor(currentMarkerActor);
 
-		//	MarkerActorList->RemoveItem(idx);
-		//	Renderer->RemoveActor(actor);
+		auto nextActor = MarkerActorCollection->GetNextActor();
+		if (nextActor == nullptr)
+			nextActor = MarkerActorCollection->GetLastActor();
 
-		//	actor = nullptr;	// auto free actor
+		SetCurrentMarker(nextActor);
+		this->Render();
 
-		//	this->Render();
-		//}
-		
+#ifdef _DEBUG
+		std::cout << "Delete marker:" << CurrentMarkerIndex << std::endl;
+#endif
 
-		//auto iter = MarkerActorList->NewIterator();
-		//while (iter->GetCurrentObject() != nullptr)
-		//{
-		//	if(iter->GetCurrentObject() == actor)
-		//	{
-		//		MarkerActorList->RemoveItem(iter);
-		//		if (iter->GetCurrentObject() != nullptr)
-		//		{
-		//			SetCurrentMarker(static_cast<vtkActor*>(iter->GetCurrentObject()));
-		//		}
-		//		break;
-		//		std::cout << "delete" << std::endl;
-		//	}
-		//	std::cout << iter->GetCurrentObject() << std::endl;
-		//	iter->GoToNextItem();
-		//}
 
-		MarkerActorList->InitTraversal();
+		MarkerActorCollection->InitTraversal();
 		vtkSmartPointer<vtkActor> curActor;
-		for (int idx = 0; idx < MarkerActorList->GetNumberOfItems(); idx++)
+		for (int idx = 0; idx < MarkerActorCollection->GetNumberOfItems(); idx++)
 		{
-			if ((curActor = MarkerActorList->GetNextActor()) != nullptr)
+			if ((curActor = MarkerActorCollection->GetNextActor()) != nullptr)
 			{
-				if (curActor.Get() == actor.Get())
+				if (curActor.Get() == currentMarkerActor.Get())
 				{
-					MarkerActorList->RemoveItem(idx);
-					Renderer->RemoveActor(actor);
+					MarkerActorCollection->RemoveItem(idx);
+					Renderer->RemoveActor(currentMarkerActor);
 
 #ifdef _DEBUG
 					std::cout << "Delete marker:" << idx << std::endl;
 #endif
 
-					auto nextActor = MarkerActorList->GetNextActor();
+					auto nextActor = MarkerActorCollection->GetNextActor();
 					if (nextActor == nullptr)
-						nextActor = MarkerActorList->GetLastActor();
+						nextActor = MarkerActorCollection->GetLastActor();
 
 					SetCurrentMarker(nextActor);
 					this->Render();
@@ -225,7 +278,7 @@ void PickingWindow::RemoveCurrentMarker()
 				}
 			}
 		}
-
+		
 	}
 #ifdef _DEBUG
 	std::cout << "Current marker #:" << MarkerActorList->GetNumberOfItems() << std::endl;
