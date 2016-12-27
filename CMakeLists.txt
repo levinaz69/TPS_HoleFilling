@@ -29,6 +29,7 @@ SET(source_files
 	)
 SET(include_files
 	include/common.h
+	include/utilities.h
 	src/PickingInteractorStyle.h
 	src/PickingWindow.h
 	)

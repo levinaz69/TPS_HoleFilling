@@ -13,6 +13,8 @@ public:
 	std::function< void(const int*) > PickingCallback;
 	std::function< void(const OPERATING_MODE) > ModeSelectingCallback;
 	std::function< void(void) > RemoveCurrentMarkerCallback;
+	std::function< void(int) > AdjustMarkerSizeCallback;
+	std::function< void(void) > WriteMarkerFileCallback;
 
 	void SetPickingCallback(std::function< void(const int*) > callback)
 	{
@@ -26,7 +28,15 @@ public:
 	{
 		RemoveCurrentMarkerCallback = callback;
 	}
-	
+	void SetAdjustMarkerSizeCallback(std::function< void(int) > callback)
+	{
+		AdjustMarkerSizeCallback = callback;
+	}
+	void SetWriteMarkerFileCallback(std::function< void(void) > callback)
+	{
+		WriteMarkerFileCallback = callback;
+	}
+
 	virtual void OnLeftButtonDown() override
 	{
 		// Handle picking callback only when not press control keys
@@ -37,10 +47,41 @@ public:
 			int* clickPos = this->GetInteractor()->GetEventPosition();
 			PickingCallback(clickPos);
 		}
-		//else
+		else // Uncomment this line to enable camara adjustment without control key pressed
 		{
 			// Forward events
 			vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
+		}
+	}
+
+	// Use right mouse button to rotate camera
+	// rotate if not press control button
+	// otherwise scale
+	virtual void OnRightButtonDown() override
+	{
+		if (!(this->GetInteractor()->GetControlKey() ||
+			this->GetInteractor()->GetShiftKey() ||
+			this->GetInteractor()->GetAltKey()))
+		{
+			vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
+		}
+		else
+		{
+			vtkInteractorStyleTrackballCamera::OnRightButtonDown();
+		}
+	}
+	virtual void OnRightButtonUp() override
+	{
+
+		if (!(this->GetInteractor()->GetControlKey() ||
+			this->GetInteractor()->GetShiftKey() ||
+			this->GetInteractor()->GetAltKey()))
+		{
+			vtkInteractorStyleTrackballCamera::OnLeftButtonUp();
+		}
+		else 
+		{
+			vtkInteractorStyleTrackballCamera::OnRightButtonUp();
 		}
 	}
 
@@ -67,10 +108,21 @@ public:
 		{
 			RemoveCurrentMarkerCallback();
 		}
-		
+		else if (key == "n")	// decrease marker size
+		{
+			AdjustMarkerSizeCallback(-1);
+		}
+		else if (key == "m")	// increase marker size
+		{
+			AdjustMarkerSizeCallback(1);
+		}
+		else if (key == "g")	// increase marker size
+		{
+			WriteMarkerFileCallback();
+		}
 
 		// Forward events
-		//vtkInteractorStyleTrackballCamera::OnKeyPress();
+		vtkInteractorStyleTrackballCamera::OnKeyPress();
 	}
 
 	//virtual void OnMiddleButtonDown() override;

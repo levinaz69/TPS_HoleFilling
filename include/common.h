@@ -3,6 +3,9 @@
 #include <vtkSmartPointer.h>
 #include <vtkPLYReader.h>
 #include <vtkPLYWriter.h>
+#include <vtkSimplePointsReader.h>
+#include <vtkSimplePointsWriter.h>
+#include <vtkErrorCode.h>
 
 #include <vtkPolyData.h>
 #include <vtkSphereSource.h>
@@ -30,6 +33,8 @@
 #include <sstream>
 #include <vector>
 #include <functional>
+
+#include <assert.h>
 
 //#include <Eigen/Dense>
 //#include <Eigen/Sparse>
