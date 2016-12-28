@@ -90,9 +90,9 @@ unsigned long PickingWindow::LoadModelFile()
 	plyReader->SetFileName(ModelFilename.c_str());
 	if (plyReader->GetErrorCode() != vtkErrorCode::NoError)
 		return plyReader->GetErrorCode();
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	std::cout << WindowID << " Load model file: " << ModelFilename << std::endl;
-#endif
+//#endif
 
 	ModelMapper->SetInputConnection(plyReader->GetOutputPort());
 	ModelActor->SetMapper(ModelMapper);
@@ -117,9 +117,9 @@ unsigned long PickingWindow::LoadMarkerFile()
 	simpleReader->SetFileName(MarkerFilename.c_str());
 	if (simpleReader->GetErrorCode() != vtkErrorCode::NoError)
 		return simpleReader->GetErrorCode();
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	std::cout << WindowID << " Load marker file: " << MarkerFilename << std::endl;
-#endif
+//#endif
 
 	auto markerMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
 	markerMapper->SetInputConnection(simpleReader->GetOutputPort());

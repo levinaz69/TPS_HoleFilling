@@ -1,5 +1,6 @@
 build/*
 !build/templates
+*/build/*
 bin/*
 !bin/media/
 *.lib
