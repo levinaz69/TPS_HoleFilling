@@ -1,5 +1,5 @@
 #pragma once
-#include "common.h"
+#include "common/common.h"
 #include "PickingWindow.h"
 
 // Handle mouse events
@@ -15,6 +15,9 @@ public:
 	std::function< void(void) > RemoveCurrentMarkerCallback;
 	std::function< void(int) > AdjustMarkerSizeCallback;
 	std::function< void(void) > WriteMarkerFileCallback;
+	std::function< void(void) > SelectToggleOperatingSimultaneouslyCallback;
+	std::function< void(void) > SelectPrevMarkerCallback;
+	std::function< void(void) > SelectNextMarkerCallback;
 
 	void SetPickingCallback(std::function< void(const int*) > callback)
 	{
@@ -36,6 +39,19 @@ public:
 	{
 		WriteMarkerFileCallback = callback;
 	}
+	void SetSelectToggleOperatingSimultaneouslyCallback(std::function< void(void) > callback)
+	{
+		SelectToggleOperatingSimultaneouslyCallback = callback;
+	}
+	void SetSelectPrevMarkerCallback(std::function< void(void) > callback)
+	{
+		SelectPrevMarkerCallback = callback;
+	}
+	void SetSelectNextMarkerCallback(std::function< void(void) > callback)
+	{
+		SelectNextMarkerCallback = callback;
+	}
+
 
 	virtual void OnLeftButtonDown() override
 	{
@@ -94,12 +110,16 @@ public:
 		// Enter different OPERATING_MODE according to the key
 		if (key == "z")
 		{
-				ModeSelectingCallback(SELECT_MODE);
+			ModeSelectingCallback(SELECT_MODE);
 		} 
 		else if (key == "a")
 		{
-			ModeSelectingCallback(CREATE_MODE);
+			ModeSelectingCallback(APPEND_MODE);
 		} 
+		else if (key == "i")
+		{
+			ModeSelectingCallback(INSERT_MODE);
+		}
 		else if (key == "x")
 		{
 			ModeSelectingCallback(MOVE_MODE);
@@ -116,9 +136,21 @@ public:
 		{
 			AdjustMarkerSizeCallback(1);
 		}
-		else if (key == "g")	// increase marker size
+		else if (key == "g")	// write marker file now
 		{
 			WriteMarkerFileCallback();
+		}
+		else if (key == "v")
+		{
+			SelectToggleOperatingSimultaneouslyCallback();
+		}
+		else if (key == "j")
+		{
+			SelectPrevMarkerCallback();
+		}
+		else if (key == "k")
+		{
+			SelectNextMarkerCallback();
 		}
 
 		// Forward events

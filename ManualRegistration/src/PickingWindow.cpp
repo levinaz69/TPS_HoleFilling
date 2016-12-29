@@ -1,16 +1,18 @@
 ﻿#include "PickingWindow.h"
+#include "PickingInteractorStyle.h"
 
-unsigned PickingWindow::WindowCount = 0;
+std::list<PickingWindow*> PickingWindow::PickingWindows;
+bool PickingWindow::OperatingSimultaneously = false;
 
 PickingWindow::PickingWindow()
 {
-	WindowID = WindowCount++; 
-
+	PickingWindows.push_back(this);
+	WindowID = PickingWindows.size() - 1;
 }
 
 PickingWindow::~PickingWindow()
 {
-
+	PickingWindows.remove(this);
 }
 
 void PickingWindow::Initialize()
@@ -36,15 +38,10 @@ void PickingWindow::Initialize()
 	// RenderWindow
 	RenderWindow = vtkSmartPointer<vtkRenderWindow>::New();
 	RenderWindow->AddRenderer(Renderer);
-	RenderWindow->InitializeFromCurrentContext();
 	//// size
 	auto ssize = RenderWindow->GetScreenSize();
 	RenderWindow->SetSize(ssize[1] / 2, ssize[1] / 2);
 	RenderWindow->SetPosition((ssize[1]) * WindowID, 0);
-	//// title
-	ostringstream oss;
-	oss << "Window " << WindowID;
-	RenderWindow->SetWindowName(oss.str().c_str());
 
 	// Interactor
 	RenderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
@@ -66,8 +63,14 @@ void PickingWindow::Initialize()
 	Renderer->AddActor2D(MarkerNumberIndicatorActor);
 	
 	// Default Mode
-	SetOperaringMode(CREATE_MODE);
+	//OperatingSimultaneously = false;
+	SetOperaringMode(APPEND_MODE);
 	SetCurrentMarker(NULL_MARKER_INDEX);
+
+	// Set RenderWindow title
+	std::ostringstream oss;
+	oss << "Window " << WindowID;
+	RenderWindow->SetWindowName(oss.str().c_str());
 }
 
 void PickingWindow::SetModelFile(const std::string filename)
@@ -101,8 +104,8 @@ unsigned long PickingWindow::LoadModelFile()
 
 	// Reset marker size according to model
 	double* bound = ModelMapper->GetBounds();
-	ModelScale = min(min(bound[1] - bound[0], bound[3] - bound[2]), bound[5] - bound[4]);
-	SetMarkerSize((ModelScale / 100.0) * 1);
+	ModelScale = std::min(std::min(bound[1] - bound[0], bound[3] - bound[2]), bound[5] - bound[4]);
+	SetMarkerSize((ModelScale / 100.0) * 2);
 
 	Renderer->ResetCamera();
 	Render();
@@ -125,7 +128,7 @@ unsigned long PickingWindow::LoadMarkerFile()
 	markerMapper->SetInputConnection(simpleReader->GetOutputPort());
 	markerMapper->Update();
 	auto markerPointPolyData = markerMapper->GetInput();
-	CreateMarker(markerPointPolyData->GetPoints());
+	AppendMarker(markerPointPolyData->GetPoints());
 
 	SetOperaringMode(SELECT_MODE);
 	Render();
@@ -183,9 +186,24 @@ void PickingWindow::SetInteractorStyle()
 		std::bind(&PickingWindow::AdjustMarkerSize, this, std::placeholders::_1) );
 	InteractorStyle->SetWriteMarkerFileCallback(
 		std::bind(&PickingWindow::WriteMarkerFile, this));
+	InteractorStyle->SetSelectToggleOperatingSimultaneouslyCallback(
+		std::bind(&PickingWindow::ToggleOperatingSimultaneously, this));
+	InteractorStyle->SetSelectPrevMarkerCallback(
+		std::bind(&PickingWindow::SelectPrevMarker, this));
+	InteractorStyle->SetSelectNextMarkerCallback(
+		std::bind(&PickingWindow::SelectNextMarker, this));
 
 	InteractorStyle->SetDefaultRenderer(Renderer);
 	RenderWindowInteractor->SetInteractorStyle(InteractorStyle);
+}
+
+void PickingWindow::ToggleOperatingSimultaneously()
+{
+	OperatingSimultaneously = !OperatingSimultaneously;
+	for (auto iter = PickingWindows.begin(); iter != PickingWindows.end(); ++iter)
+	{
+		(*iter)->SetOperaringMode(OperatingMode);
+	}
 }
 
 void PickingWindow::SetMarkerSize(double size)
@@ -233,9 +251,13 @@ void PickingWindow::PickingCallback(const int* clickPos)
 			//// Next: move selected actor
 			//OperatingMode = MOVE_MODE;
 		}
-		else if (OperatingMode == CREATE_MODE)
+		else if (OperatingMode == APPEND_MODE)
 		{
-			CreateMarker(picked_pos);
+			AppendMarker(picked_pos);
+		}
+		else if (OperatingMode == INSERT_MODE)
+		{
+			InsertMarker(CurrentMarkerIndex, picked_pos);
 		}
 		else if (OperatingMode == MOVE_MODE)
 		{
@@ -247,25 +269,36 @@ void PickingWindow::PickingCallback(const int* clickPos)
 
 void PickingWindow::SetOperaringMode(const OPERATING_MODE mode)
 {
+	std::string indicatorText;
 	if (mode == SELECT_MODE)
 	{
 		OperatingMode = SELECT_MODE;
-		ModeIndicatorActor->SetInput("Select");
+		indicatorText = "Select";
 	}
-	else if (mode == CREATE_MODE)
+	else if (mode == APPEND_MODE)
 	{
-		OperatingMode = CREATE_MODE;
-		ModeIndicatorActor->SetInput("Add");
+		OperatingMode = APPEND_MODE;
+		indicatorText = "Append";
+	}
+	else if (mode == INSERT_MODE)
+	{
+		OperatingMode = INSERT_MODE;
+		indicatorText = "Insert";
 	}
 	else if (mode == MOVE_MODE)
 	{
 		OperatingMode = MOVE_MODE;
-		ModeIndicatorActor->SetInput("Move");
+		indicatorText = "Move";
 	}
+	if (OperatingSimultaneously)
+	{
+		indicatorText += " [S]";
+	}
+	ModeIndicatorActor->SetInput(indicatorText.c_str());
 	Render();
-#if _DEBUG
-	std::cout << WindowID << " Set Current mode to " << this->OperatingMode << std::endl;
-#endif
+//#if _DEBUG
+//	std::cout << WindowID << " Set Current mode to " << this->OperatingMode << std::endl;
+//#endif
 }
 
 long PickingWindow::GetMarkerIndex(const vtkSmartPointer<vtkActor> actor)
@@ -281,16 +314,32 @@ long PickingWindow::GetMarkerIndex(const vtkSmartPointer<vtkActor> actor)
 	return NULL_MARKER_INDEX;
 }
 
-void PickingWindow::CreateMarker(double* pos)
+
+void PickingWindow::AppendMarker(double* pos)
 {
+	InsertMarker(NULL_MARKER_INDEX, pos);	// append
+}
+
+void PickingWindow::AppendMarker(vtkPoints* points)
+{
+	InsertMarker(NULL_MARKER_INDEX, points);	// append
+}
+
+void PickingWindow::InsertMarker(long index, double* pos)
+{
+	assert(index >= NULL_MARKER_INDEX && index <= MarkerActors.size());
+	if (index == NULL_MARKER_INDEX)		// Append
+		index = MarkerActors.size();
+
 	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
 	actor->SetMapper(MarkerSphereMapper);
 	actor->SetPosition(pos[0], pos[1], pos[2]);
 
 	//Add actor to list
-	MarkerActors.push_back(actor);
-	long idx = MarkerActors.size() - 1;
-	SetCurrentMarker(idx);
+	if (CurrentMarkerIndex >= index)
+		CurrentMarkerIndex = index + 1;		// previous marker
+	MarkerActors.insert(MarkerActors.begin() + index, actor);
+	SetCurrentMarker(index);
 	MarkerActorCollection->AddItem(actor);
 
 	//Add actor to renderer
@@ -301,16 +350,20 @@ void PickingWindow::CreateMarker(double* pos)
 	std::cout << WindowID << " Add marker: " << idx << std::endl;
 	//std::cout << WindowID << " Current marker #: " << MarkerActors.size() << std::endl;
 #endif
-
 }
 
-void PickingWindow::CreateMarker(vtkPoints* points)
+void PickingWindow::InsertMarker(long index, vtkPoints* points)
 {
+	assert(index >= NULL_MARKER_INDEX && index <= MarkerActors.size());
+	if (index == NULL_MARKER_INDEX)		// Append
+		index = MarkerActors.size();
+
 	if (points->GetNumberOfPoints() == 0)
 		return;
-	
-	long idx = CurrentMarkerIndex;
-	for (vtkIdType i = 0; i < points->GetNumberOfPoints(); i++)
+
+	auto pointsNum = points->GetNumberOfPoints();
+	std::vector< vtkSmartPointer<vtkActor> > actors(pointsNum);
+	for (vtkIdType i = 0; i < pointsNum; i++)
 	{
 		double xyz[3];
 		points->GetPoint(i, xyz);
@@ -319,38 +372,75 @@ void PickingWindow::CreateMarker(vtkPoints* points)
 		actor->SetMapper(MarkerSphereMapper);
 		actor->SetPosition(xyz[0], xyz[1], xyz[2]);
 		actor->GetProperty()->SetColor(MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2]);
-		MarkerActors.push_back(actor);
+
+		actors[i] = actor;		
 		MarkerActorCollection->AddItem(actor);
 		Renderer->AddActor(actor);
-
-		idx = MarkerActors.size() - 1;
-#ifdef _DEBUG
-		std::cout << WindowID << " Add marker: " << idx << std::endl;
-		//std::cout << WindowID << " Current marker #: " << MarkerActors.size() << std::endl;
-#endif
 	}
+	if (CurrentMarkerIndex >= index)
+		CurrentMarkerIndex = index + pointsNum;		// previous marker
+	MarkerActors.insert(MarkerActors.begin() + index, actors.begin(), actors.end());
+	auto idx = index + pointsNum - 1;
+
+#ifdef _DEBUG
+	std::cout << WindowID << " Add marker: " << idx << std::endl;
+	//std::cout << WindowID << " Current marker #: " << MarkerActors.size() << std::endl;
+#endif
 
 	SetCurrentMarker(idx);
 	Render();
+}
 
+
+void PickingWindow::SelectPrevMarker()
+{
+	auto index = CurrentMarkerIndex;
+	index -= 1;
+	if (index >= 0 && index < MarkerActors.size())
+		SelectMarker(index);
+}
+void PickingWindow::SelectNextMarker()
+{
+	auto index = CurrentMarkerIndex;
+	index += 1;
+	if (index >= 0 && index < MarkerActors.size())
+		SelectMarker(index);
+}
+
+
+void PickingWindow::SelectMarker(long index)
+{
+	if (OperatingSimultaneously)
+	{
+		for (auto iter = PickingWindows.begin(); iter != PickingWindows.end(); ++iter)
+		{
+			(*iter)->SetCurrentMarker(index);
+		}
+	}
+	else
+	{
+		SetCurrentMarker(index);
+	}
 }
 
 void PickingWindow::SetCurrentMarker(long index)
 {
-	if (index != NULL_MARKER_INDEX)
+	if (CurrentMarkerIndex != NULL_MARKER_INDEX && CurrentMarkerIndex < MarkerActors.size())
 	{
-		if (CurrentMarkerIndex != NULL_MARKER_INDEX && CurrentMarkerIndex < MarkerActors.size())
-		{
-			auto& currentMarkerActor = MarkerActors[CurrentMarkerIndex];
-			currentMarkerActor->GetProperty()->
-				SetColor(MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2]);
-		}
+		auto& currentMarkerActor = MarkerActors[CurrentMarkerIndex];
+		currentMarkerActor->GetProperty()->
+			SetColor(MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2]);
+	}
+	if (index != NULL_MARKER_INDEX && index < MarkerActors.size())
+	{
 		MarkerActors[index]->GetProperty()->
 			SetColor(MARKER_COLOR_SELECTED[0], MARKER_COLOR_SELECTED[1], MARKER_COLOR_SELECTED[2]);
+		CurrentMarkerIndex = index;
 	}
-	CurrentMarkerIndex = index;
+	else
+		CurrentMarkerIndex = NULL_MARKER_INDEX;
 	// Refresh marker number indicator
-	ostringstream oss;
+	std::ostringstream oss;
 	oss << MarkerActors.size() << " [" << CurrentMarkerIndex << "]";
 	MarkerNumberIndicatorActor->SetInput(oss.str().c_str());
 	// Refresh render

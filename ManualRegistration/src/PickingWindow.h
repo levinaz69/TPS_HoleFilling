@@ -1,17 +1,56 @@
 ﻿#pragma once
-#include "common.h"
-#include "utilities.h"
-#include "PickingInteractorStyle.h"
+#include "common/common.h"
+#include "common/utilities.h"
 
-#define NULL_MARKER_INDEX -1
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <vector>
+#include <list>
+#include <sstream>
+#include <vector>
+#include <functional>
+#include <assert.h>
+
+#include <vtkSmartPointer.h>
+#include <vtkPLYReader.h>
+#include <vtkPLYWriter.h>
+#include <vtkSimplePointsReader.h>
+#include <vtkSimplePointsWriter.h>
+#include <vtkErrorCode.h>
+#include <vtkPolyData.h>
+#include <vtkSphereSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkActorCollection.h>
+#include <vtkCollectionIterator.h>
+#include <vtkTextActor.h>
+#include <vtkTextProperty.h>
+//#include <vtkLabeledDataMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPropPicker.h>
+#include <vtkProperty.h>
+
+
+const long NULL_MARKER_INDEX = -1;
+const double MARKER_COLOR[3] = { 0.0, 1.0, 0.0 };
+const double MARKER_COLOR_SELECTED[3] = { 1.0, 0.0, 0.0 };
+enum OPERATING_MODE
+{
+	SELECT_MODE,
+	APPEND_MODE,
+	INSERT_MODE,
+	MOVE_MODE
+};
 
 class PickingInteractorStyle;
 
 class PickingWindow
 {
 public:
-	OPERATING_MODE OperatingMode;
-
 	PickingWindow();
 	~PickingWindow();
 
@@ -22,24 +61,35 @@ public:
 	unsigned long LoadMarkerFile();
 	void Render();
 	void SetInteractorStyle();
+	void ToggleOperatingSimultaneously();
 	void WriteMarkerFile();
 	void SetMarkerSize(double size);
 	void AdjustMarkerSize(int step);
 	void PickingCallback(const int* clickPos);
 	void SetOperaringMode(const OPERATING_MODE mode);
 	long GetMarkerIndex(vtkSmartPointer<vtkActor> actor);
-	void CreateMarker(double* pos);
-	void CreateMarker(vtkPoints* points);
+	void AppendMarker(double* pos);
+	void AppendMarker(vtkPoints* points);
+	void InsertMarker(long index, double* pos);
+	void InsertMarker(long index, vtkPoints* points);
+	void SelectPrevMarker();
+	void SelectNextMarker();
+	void SelectMarker(long index);
 	void SetCurrentMarker(long index);
 	void SetCurrentMarker(vtkSmartPointer<vtkActor> actor);
 	void MoveCurrentMarker(double x, double y, double z);
 	void RemoveCurrentMarker();
 
-	//protected:
+	vtkRenderWindowInteractor* GetRenderWindowInteractor() const { return RenderWindowInteractor; }
+
 public:
-	// Basic
-	static unsigned WindowCount;
+	static std::list<PickingWindow*> PickingWindows;
 	unsigned WindowID;
+	OPERATING_MODE OperatingMode;
+	static bool OperatingSimultaneously;
+
+protected:
+	// Basic
 	std::string ModelFilename;
 	std::string MarkerFilename;
 

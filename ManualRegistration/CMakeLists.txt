@@ -20,15 +20,13 @@ INCLUDE(${VTK_USE_FILE})
 
 #SET(CMAKE_CXX_STANDARD 11)
 
-INCLUDE_DIRECTORIES(include)
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
+
 SET(source_files 
 	src/ManualRegistration.cpp
-	src/PickingInteractorStyle.cpp
 	src/PickingWindow.cpp
 	)
 SET(include_files
-	include/common.h
-	include/utilities.h
 	src/PickingInteractorStyle.h
 	src/PickingWindow.h
 	)

@@ -1,55 +1,8 @@
 #pragma once
 
-#include <vtkSmartPointer.h>
-#include <vtkPLYReader.h>
-#include <vtkPLYWriter.h>
-#include <vtkSimplePointsReader.h>
-#include <vtkSimplePointsWriter.h>
-#include <vtkErrorCode.h>
-
-#include <vtkPolyData.h>
-#include <vtkSphereSource.h>
-#include <vtkPolyDataMapper.h>
-
-#include <vtkActor.h>
-#include <vtkActorCollection.h>
-#include <vtkCollectionIterator.h>
-
-#include <vtkTextActor.h>
-#include <vtkTextProperty.h>
-//#include <vtkLabeledDataMapper.h>
-
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkPropPicker.h>
-#include <vtkProperty.h>
-
-#include <cstdlib>
-#include <iostream>
-#include <memory>
-#include <vector>
-#include <sstream>
-#include <vector>
-#include <functional>
-
-#include <assert.h>
 
 //#include <Eigen/Dense>
 //#include <Eigen/Sparse>
-
-using namespace std;
-
-
-const double MARKER_COLOR[3] = { 0.0, 1.0, 0.0 };
-const double MARKER_COLOR_SELECTED[3] = { 1.0, 0.0, 0.0 };
-enum OPERATING_MODE
-{
-	SELECT_MODE,
-	CREATE_MODE,
-	MOVE_MODE
-};
 
 //// Geometry data types
 //typedef double Scalar;
