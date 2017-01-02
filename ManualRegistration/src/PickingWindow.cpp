@@ -156,9 +156,9 @@ void PickingWindow::WriteMarkerFile()
 	//plyWriter->SetInputData(markerPointData);
 	//plyWriter->SetFileTypeToASCII();
 	//plyWriter->Write();
-#ifdef _DEBUG
-	std::cout << WindowID << " Output marker file: " << MarkerFilename << std::endl;
-#endif
+
+	std::cout << WindowID << " Write marker file: " << MarkerFilename << std::endl;
+
 }
 
 void PickingWindow::Render()
@@ -347,14 +347,14 @@ void PickingWindow::InsertMarker(long index, double* pos)
 	Render();
 
 #ifdef _DEBUG
-	std::cout << WindowID << " Add marker: " << idx << std::endl;
+	std::cout << WindowID << " Add marker: " << index << std::endl;
 	//std::cout << WindowID << " Current marker #: " << MarkerActors.size() << std::endl;
 #endif
 }
 
 void PickingWindow::InsertMarker(long index, vtkPoints* points)
 {
-	assert(index >= NULL_MARKER_INDEX && index <= MarkerActors.size());
+	assert(index >= NULL_MARKER_INDEX && index <= (long)MarkerActors.size());
 	if (index == NULL_MARKER_INDEX)		// Append
 		index = MarkerActors.size();
 
@@ -383,7 +383,7 @@ void PickingWindow::InsertMarker(long index, vtkPoints* points)
 	auto idx = index + pointsNum - 1;
 
 #ifdef _DEBUG
-	std::cout << WindowID << " Add marker: " << idx << std::endl;
+	std::cout << WindowID << " Add marker: " << index << "-" << idx << std::endl;
 	//std::cout << WindowID << " Current marker #: " << MarkerActors.size() << std::endl;
 #endif
 
