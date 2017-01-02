@@ -14,15 +14,19 @@
 #include <vtkProperty.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <vtkVertexGlyphFilter.h>
+
 #include <vtkSimplePointsReader.h>
+#include <vtkSimplePointsWriter.h>
+#include <vtkPLYReader.h>
+#include <vtkPLYWriter.h>
 
 #include <string>
 #include <vtkArrayWriter.h>
 #include <vtkDenseArray.h>
 #include <vtkArrayData.h>
 #include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkPLYReader.h>
-#include <vtkGlyph3D.h>
+
+#include <vtkIterativeClosestPointTransform.h>
 
 vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtkPoints* targetPoints)
 {
@@ -31,8 +35,8 @@ vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtk
 	transform->SetSourceLandmarks(sourcePoints);
 	transform->SetTargetLandmarks(targetPoints);
 	//transform->SetModeToRigidBody();
-	transform->SetModeToSimilarity();
-	//transform->SetModeToAffine();
+	//transform->SetModeToSimilarity();
+	transform->SetModeToAffine();
 	transform->Update();
 
 	// Display the transformation matrix that was computed
@@ -57,6 +61,40 @@ vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtk
 
 	return transform;
 }
+
+//vtkSmartPointer<vtkPolyData> CreatePolyData(vtkPoints* points)
+//{
+//	vtkSmartPointer<vtkPolyData> temp =
+//		vtkSmartPointer<vtkPolyData>::New();
+//	temp->SetPoints(points);
+//
+//	vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter =
+//		vtkSmartPointer<vtkVertexGlyphFilter>::New();
+//
+//	vertexFilter->SetInputData(temp);
+//	vertexFilter->Update();
+//	return vertexFilter->GetOutput();
+//}
+//vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtkPoints* targetPoints)
+//{
+//	// Setup ICP transform
+//	vtkSmartPointer<vtkIterativeClosestPointTransform> icp =
+//		vtkSmartPointer<vtkIterativeClosestPointTransform>::New();
+//	icp->SetSource(CreatePolyData(sourcePoints));
+//	icp->SetTarget(CreatePolyData(targetPoints));
+//	icp->GetLandmarkTransform()->SetModeToRigidBody();
+//	icp->SetMaximumNumberOfIterations(20);
+//	//icp->StartByMatchingCentroidsOn();
+//	icp->Modified();
+//	icp->Update();
+//
+//	// Get the resulting transformation matrix (this matrix takes the source points to the target points)
+//	vtkSmartPointer<vtkMatrix4x4> m = icp->GetMatrix();
+//	std::cout << "The resulting matrix is: " << *m << std::endl;
+//
+//	return icp;
+//}
+
 
 vtkSmartPointer<vtkPolyData> ApplyTransform(vtkSmartPointer<vtkAbstractTransform> transform, vtkSmartPointer<vtkPolyData> polyData)
 {
@@ -173,6 +211,94 @@ vtkSmartPointer<vtkRenderWindowInteractor> VisualizeMesh(vtkPolyData* sourceMesh
 	return renderWindowInteractor;
 }
 
+vtkSmartPointer<vtkRenderWindowInteractor> Visualize(
+	vtkPolyData* source, vtkPolyData* target, vtkPolyData* solution, 
+	vtkPolyData* sourceMesh, vtkPolyData* targetMesh, vtkPolyData* solutionMesh)
+{
+	// Create a renderer, render window, and interactor
+	auto renderer = vtkSmartPointer<vtkRenderer>::New();
+	auto renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+	renderWindow->AddRenderer(renderer);
+	auto renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	renderWindowInteractor->SetRenderWindow(renderWindow);
+	auto interactorStyle = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+	interactorStyle->SetDefaultRenderer(renderer);
+	renderWindowInteractor->SetInteractorStyle(interactorStyle);
+
+	// Markers
+	{
+		auto sourceActor = GetPointsActor(source);
+		auto targetActor = GetPointsActor(target);
+		auto solutionActor = GetPointsActor(solution);
+
+		sourceActor->GetProperty()->SetColor(0, 1, 0);
+		sourceActor->GetProperty()->SetPointSize(4);
+
+		targetActor->GetProperty()->SetColor(1, 0, 0);
+		targetActor->GetProperty()->SetPointSize(4);
+
+		solutionActor->GetProperty()->SetColor(0, 0, 1);
+		solutionActor->GetProperty()->SetPointSize(4);
+
+		// Add the actor to the scene
+		//renderer->AddActor(sourceActor);
+		renderer->AddActor(targetActor);
+		renderer->AddActor(solutionActor);
+	}
+
+	// Mesh
+	{
+		//vtkSmartPointer<vtkPolyDataMapper> sourceMapper =
+		//	vtkSmartPointer<vtkPolyDataMapper>::New();
+		//sourceMapper->SetInputData(sourceMesh);
+
+		//vtkSmartPointer<vtkActor> sourceActor =
+		//	vtkSmartPointer<vtkActor>::New();
+		//sourceActor->SetMapper(sourceMapper);
+		//sourceActor->GetProperty()->SetColor(0, 1, 0);
+
+		//vtkSmartPointer<vtkPolyDataMapper> targetMapper =
+		//	vtkSmartPointer<vtkPolyDataMapper>::New();
+		//targetMapper->SetInputData(targetMesh);
+
+		//vtkSmartPointer<vtkActor> targetActor =
+		//	vtkSmartPointer<vtkActor>::New();
+		//targetActor->SetMapper(targetMapper);
+		//targetActor->GetProperty()->SetColor(1, 0, 0);
+		//targetActor->GetProperty()->SetOpacity(0.5);
+
+		//vtkSmartPointer<vtkPolyDataMapper> solutionMapper =
+		//	vtkSmartPointer<vtkPolyDataMapper>::New();
+		//solutionMapper->SetInputData(solutionMesh);
+
+		//vtkSmartPointer<vtkActor> solutionActor =
+		//	vtkSmartPointer<vtkActor>::New();
+		//solutionActor->SetMapper(solutionMapper);
+		//solutionActor->GetProperty()->SetColor(0, 0, 1);
+		//solutionActor->GetProperty()->SetOpacity(0.5);
+
+		auto sourceActor = GetPointsActor(sourceMesh);
+		auto targetActor = GetPointsActor(targetMesh);
+		auto solutionActor = GetPointsActor(solutionMesh);
+
+		sourceActor->GetProperty()->SetColor(0, 0.5, 0);
+
+		targetActor->GetProperty()->SetColor(0.5, 0, 0);
+
+		solutionActor->GetProperty()->SetColor(0, 0, 0.5);
+
+		// Add the actor to the scene
+		//renderer->AddActor(sourceActor);
+		renderer->AddActor(targetActor);
+		renderer->AddActor(solutionActor);
+	}
+
+	renderer->SetBackground(0, 0, 0);
+	renderWindow->Render();
+	return renderWindowInteractor;
+
+}
+
 //// Main
 int main(int argc, char* argv[])
 {
@@ -243,12 +369,42 @@ int main(int argc, char* argv[])
 	auto solution = ApplyTransform(transform, source);
 	auto solutionMesh = useSourceMesh ? ApplyTransform(transform, sourceMesh) : nullptr;
 
+	// Save Solution
+	//// marker
+	vtkStdString solutionPointsFilename = Utility::GetBaseFilename(sourceMarkerFilename.c_str());
+	solutionPointsFilename += "_transformed.xyz";
+
+	auto solutionPointsWriter = vtkSmartPointer<vtkSimplePointsWriter>::New();
+	solutionPointsWriter->SetFileName(solutionPointsFilename.c_str());
+	solutionPointsWriter->SetInputData(solution);
+	solutionPointsWriter->Update();
+	solutionPointsWriter->Write();
+
+	//// mesh
+	if (useSourceMesh)
+	{
+		vtkStdString solutionMeshFilename = Utility::GetBaseFilename(sourceMeshFilename.c_str());
+		solutionMeshFilename += "_transformed.ply";
+
+		auto solutionMeshWriter = vtkSmartPointer<vtkPLYWriter>::New();
+		solutionMeshWriter->SetFileName(solutionMeshFilename.c_str());
+		solutionMeshWriter->SetInputData(solutionMesh);
+		solutionMeshWriter->Update();
+		solutionMeshWriter->Write();
+	}
+
+
 	// Visualization
 	std::vector< vtkSmartPointer<vtkRenderWindowInteractor> > interactors;
 	interactors.push_back( VisualizeMarker(source, target, solution) );
-	if (useTargetMesh) 
-		interactors.push_back( VisualizeMesh(sourceMesh, targetMesh, solutionMesh) );
+	if (useTargetMesh)
+	{
+		//interactors.push_back(VisualizeMesh(sourceMesh, targetMesh, solutionMesh));
+		interactors.clear();
+		interactors.push_back(Visualize(source, target, solution, sourceMesh, targetMesh, solutionMesh));
+	}
 	interactors.back()->Start();
+
 
 	return EXIT_SUCCESS;
 }
