@@ -247,7 +247,7 @@ void PickingWindow::PickingCallback(const int* clickPos)
 	{
 		if (OperatingMode == SELECT_MODE)
 		{
-			SetCurrentMarker(picked_actor);
+			SelectMarker(picked_actor);
 			//// Next: move selected actor
 			//OperatingMode = MOVE_MODE;
 		}
@@ -327,7 +327,7 @@ void PickingWindow::AppendMarker(vtkPoints* points)
 
 void PickingWindow::InsertMarker(long index, double* pos)
 {
-	assert(index >= NULL_MARKER_INDEX && index <= MarkerActors.size());
+	assert(index >= NULL_MARKER_INDEX && index <= (long)MarkerActors.size());
 	if (index == NULL_MARKER_INDEX)		// Append
 		index = MarkerActors.size();
 
@@ -420,6 +420,20 @@ void PickingWindow::SelectMarker(long index)
 	else
 	{
 		SetCurrentMarker(index);
+	}
+}
+void PickingWindow::SelectMarker(vtkSmartPointer<vtkActor> actor)
+{
+	if (OperatingSimultaneously)
+	{
+		for (auto iter = PickingWindows.begin(); iter != PickingWindows.end(); ++iter)
+		{
+			(*iter)->SetCurrentMarker(GetMarkerIndex(actor));
+		}
+	}
+	else
+	{
+		SetCurrentMarker(GetMarkerIndex(actor));
 	}
 }
 

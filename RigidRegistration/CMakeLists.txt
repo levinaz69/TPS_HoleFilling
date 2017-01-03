@@ -18,15 +18,14 @@ SET(gmnr_libraries
 
 SET(source_files
 	src/RigidRegistration.cpp
+	src/RigidTransform.cpp
 )
 SET(include_files
+	src/RigidTransform.h
+	src/TransformInteractorStyle.h
 )
 
 #ADD_EXECUTABLE(${PROJECT_NAME} MACOSX_BUNDLE ${source_files} ${include_files})
 ADD_EXECUTABLE(${PROJECT_NAME} ${source_files} ${include_files})
 ADD_DEPENDENCIES(${PROJECT_NAME} ${gmnr_libraries})
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${VTK_LIBRARIES} ${gmnr_libraries})
-
-
-ADD_EXECUTABLE(LandmarkTransform src/LandmarkTransform.cxx)
-TARGET_LINK_LIBRARIES(LandmarkTransform ${VTK_LIBRARIES})

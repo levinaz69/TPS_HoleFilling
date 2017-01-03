@@ -3,6 +3,7 @@
 
 #include <vtkVersion.h>
 #include <vtkPoints.h>
+#include <vtkPointData.h>
 #include <vtkSmartPointer.h>
 #include <vtkLandmarkTransform.h>
 #include <vtkMatrix4x4.h>
@@ -26,41 +27,20 @@
 #include <vtkArrayData.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 
-#include <vtkIterativeClosestPointTransform.h>
+#include <vtkThinPlateSplineTransform.h>
 
-vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtkPoints* targetPoints)
-{
-	// Setup the transform
-	auto transform = vtkSmartPointer<vtkLandmarkTransform>::New();
-	transform->SetSourceLandmarks(sourcePoints);
-	transform->SetTargetLandmarks(targetPoints);
-	//transform->SetModeToRigidBody();
-	//transform->SetModeToSimilarity();
-	transform->SetModeToAffine();
-	transform->Update();
 
-	// Display the transformation matrix that was computed
-	vtkMatrix4x4* mat = transform->GetMatrix();
-	std::cout << "Matrix: " << *mat << std::endl;
+/*
 
-	// Save matrix to file
-	auto matArray = vtkSmartPointer< vtkDenseArray<double> >::New();
-	matArray->Resize(4, 4);
-	for (int i = 0; i < 4; ++i)
-		for (int j = 0; j < 4; ++j)
-			matArray->SetValue(i, j, mat->GetElement(i, j));
+#define SHOW_MESH false
+#define SHOW_COLOR false
+#define SHOW_SOURCE true
+#define FILENAME_POSTFIX "_Transformed"
 
-	//vtkStdString matFilename = "";
-	//matFilename += Utility::GetBaseFilename(sourceMarkerFilename.c_str());
-	//matFilename += "-";
-	//matFilename += Utility::GetBaseFilename(targetMarkerFilename.c_str());
-	//matFilename += "_mat.txt";
-	vtkStdString matFilename = "transform_mat.txt";
-	auto matArrayWriter = vtkSmartPointer<vtkArrayWriter>::New();
-	matArrayWriter->Write(matArray, matFilename);
+*/
 
-	return transform;
-}
+
+vtkSmartPointer<vtkAbstractTransform> CalcTransform(vtkPoints* sourcePoints, vtkPoints* targetPoints);
 
 //vtkSmartPointer<vtkPolyData> CreatePolyData(vtkPoints* points)
 //{
@@ -124,7 +104,7 @@ vtkSmartPointer<vtkRenderWindowInteractor> VisualizeMarker(vtkPolyData* source, 
 	auto sourceActor = GetPointsActor(source);
 	auto targetActor = GetPointsActor(target);
 	auto solutionActor = GetPointsActor(solution);
-	
+
 	sourceActor->GetProperty()->SetColor(0, 1, 0);
 	sourceActor->GetProperty()->SetPointSize(4);
 
@@ -135,8 +115,8 @@ vtkSmartPointer<vtkRenderWindowInteractor> VisualizeMarker(vtkPolyData* source, 
 	solutionActor->GetProperty()->SetPointSize(3);
 
 	// Create a renderer, render window, and interactor
-	auto renderer =	vtkSmartPointer<vtkRenderer>::New();
-	auto renderWindow =	vtkSmartPointer<vtkRenderWindow>::New();
+	auto renderer = vtkSmartPointer<vtkRenderer>::New();
+	auto renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
 	renderWindow->AddRenderer(renderer);
 	auto renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
 	renderWindowInteractor->SetRenderWindow(renderWindow);
@@ -148,7 +128,7 @@ vtkSmartPointer<vtkRenderWindowInteractor> VisualizeMarker(vtkPolyData* source, 
 	//renderer->AddActor(sourceActor);
 	renderer->AddActor(targetActor);
 	renderer->AddActor(solutionActor);
-	renderer->SetBackground(0, 0, 0); 
+	renderer->SetBackground(0, 0, 0);
 
 	renderWindow->Render();
 	return renderWindowInteractor;
@@ -212,7 +192,7 @@ vtkSmartPointer<vtkRenderWindowInteractor> VisualizeMesh(vtkPolyData* sourceMesh
 }
 
 vtkSmartPointer<vtkRenderWindowInteractor> Visualize(
-	vtkPolyData* source, vtkPolyData* target, vtkPolyData* solution, 
+	vtkPolyData* source, vtkPolyData* target, vtkPolyData* solution,
 	vtkPolyData* sourceMesh, vtkPolyData* targetMesh, vtkPolyData* solutionMesh)
 {
 	// Create a renderer, render window, and interactor
@@ -232,75 +212,88 @@ vtkSmartPointer<vtkRenderWindowInteractor> Visualize(
 		auto solutionActor = GetPointsActor(solution);
 
 		sourceActor->GetProperty()->SetColor(0, 1, 0);
-		sourceActor->GetProperty()->SetPointSize(4);
+		sourceActor->GetProperty()->SetPointSize(5);
 
 		targetActor->GetProperty()->SetColor(1, 0, 0);
-		targetActor->GetProperty()->SetPointSize(4);
+		targetActor->GetProperty()->SetPointSize(5);
 
 		solutionActor->GetProperty()->SetColor(0, 0, 1);
-		solutionActor->GetProperty()->SetPointSize(4);
+		solutionActor->GetProperty()->SetPointSize(5);
 
 		// Add the actor to the scene
-		//renderer->AddActor(sourceActor);
+#if SHOW_SOURCE
+		renderer->AddActor(sourceActor);
+#endif //SHOW_SOURCE
 		renderer->AddActor(targetActor);
 		renderer->AddActor(solutionActor);
 	}
 
 	// Mesh
 	{
-		//vtkSmartPointer<vtkPolyDataMapper> sourceMapper =
-		//	vtkSmartPointer<vtkPolyDataMapper>::New();
-		//sourceMapper->SetInputData(sourceMesh);
+#if SHOW_MESH
+		//// mesh form
+		vtkSmartPointer<vtkPolyDataMapper> sourceMapper =
+			vtkSmartPointer<vtkPolyDataMapper>::New();
+		sourceMapper->SetInputData(sourceMesh);
 
-		//vtkSmartPointer<vtkActor> sourceActor =
-		//	vtkSmartPointer<vtkActor>::New();
-		//sourceActor->SetMapper(sourceMapper);
-		//sourceActor->GetProperty()->SetColor(0, 1, 0);
+		vtkSmartPointer<vtkActor> sourceActor =
+			vtkSmartPointer<vtkActor>::New();
+		sourceActor->SetMapper(sourceMapper);
+		sourceActor->GetProperty()->SetColor(0, 1, 0);
+		sourceActor->GetProperty()->SetOpacity(0.6);
 
-		//vtkSmartPointer<vtkPolyDataMapper> targetMapper =
-		//	vtkSmartPointer<vtkPolyDataMapper>::New();
-		//targetMapper->SetInputData(targetMesh);
+		vtkSmartPointer<vtkPolyDataMapper> targetMapper =
+			vtkSmartPointer<vtkPolyDataMapper>::New();
+		targetMapper->SetInputData(targetMesh);
 
-		//vtkSmartPointer<vtkActor> targetActor =
-		//	vtkSmartPointer<vtkActor>::New();
-		//targetActor->SetMapper(targetMapper);
-		//targetActor->GetProperty()->SetColor(1, 0, 0);
-		//targetActor->GetProperty()->SetOpacity(0.5);
+		vtkSmartPointer<vtkActor> targetActor =
+			vtkSmartPointer<vtkActor>::New();
+		targetActor->SetMapper(targetMapper);
+		targetActor->GetProperty()->SetColor(1, 0, 0);
+		targetActor->GetProperty()->SetOpacity(0.6);
 
-		//vtkSmartPointer<vtkPolyDataMapper> solutionMapper =
-		//	vtkSmartPointer<vtkPolyDataMapper>::New();
-		//solutionMapper->SetInputData(solutionMesh);
+		vtkSmartPointer<vtkPolyDataMapper> solutionMapper =
+			vtkSmartPointer<vtkPolyDataMapper>::New();
+		solutionMapper->SetInputData(solutionMesh);
 
-		//vtkSmartPointer<vtkActor> solutionActor =
-		//	vtkSmartPointer<vtkActor>::New();
-		//solutionActor->SetMapper(solutionMapper);
-		//solutionActor->GetProperty()->SetColor(0, 0, 1);
-		//solutionActor->GetProperty()->SetOpacity(0.5);
-
+		vtkSmartPointer<vtkActor> solutionActor =
+			vtkSmartPointer<vtkActor>::New();
+		solutionActor->SetMapper(solutionMapper);
+		solutionActor->GetProperty()->SetColor(0, 0, 1);
+		solutionActor->GetProperty()->SetOpacity(0.6);
+#else //SHOW_MESH
+		//// vertices form
 		auto sourceActor = GetPointsActor(sourceMesh);
 		auto targetActor = GetPointsActor(targetMesh);
 		auto solutionActor = GetPointsActor(solutionMesh);
 
 		sourceActor->GetProperty()->SetColor(0, 0.5, 0);
-
+		sourceActor->GetProperty()->SetPointSize(2);
 		targetActor->GetProperty()->SetColor(0.5, 0, 0);
-
+		targetActor->GetProperty()->SetPointSize(2);
 		solutionActor->GetProperty()->SetColor(0, 0, 0.5);
+		solutionActor->GetProperty()->SetPointSize(2);
+#endif //SHOW_MESH
 
 		// Add the actor to the scene
-		//renderer->AddActor(sourceActor);
+#if SHOW_SOURCE
+		renderer->AddActor(sourceActor);
+#endif //SHOW_SOURCE
 		renderer->AddActor(targetActor);
 		renderer->AddActor(solutionActor);
 	}
 
-	renderer->SetBackground(0, 0, 0);
+	//renderer->SetBackground(0, 0, 0);	// black
+	renderer->SetBackground(0.5, 0.5, 0.5);
+	auto ssize = renderWindow->GetScreenSize();
+	renderWindow->SetSize(ssize[1] * 0.8, ssize[1] * 0.8);
 	renderWindow->Render();
 	return renderWindowInteractor;
 
 }
 
 //// Main
-int main(int argc, char* argv[])
+int Main(int argc, char* argv[])
 {
 	if (argc < 3)
 	{
@@ -362,6 +355,12 @@ int main(int argc, char* argv[])
 		targetMesh = targetMeshReader->GetOutput();
 	}
 
+#if !SHOW_COLOR
+	// clean up color information
+	if (auto colorArray = sourceMesh->GetPointData()->GetScalars()) colorArray->Reset();
+	if (auto colorArray = targetMesh->GetPointData()->GetScalars()) colorArray->Reset();
+#endif //SHOW_COLOR
+
 	// Calculate Transform
 	auto transform = CalcTransform(sourcePoints, targetPoints);
 
@@ -372,7 +371,8 @@ int main(int argc, char* argv[])
 	// Save Solution
 	//// marker
 	vtkStdString solutionPointsFilename = Utility::GetBaseFilename(sourceMarkerFilename.c_str());
-	solutionPointsFilename += "_transformed.xyz";
+	solutionPointsFilename += FILENAME_POSTFIX;
+	solutionPointsFilename += ".xyz";
 
 	auto solutionPointsWriter = vtkSmartPointer<vtkSimplePointsWriter>::New();
 	solutionPointsWriter->SetFileName(solutionPointsFilename.c_str());
@@ -380,23 +380,27 @@ int main(int argc, char* argv[])
 	solutionPointsWriter->Update();
 	solutionPointsWriter->Write();
 
+	std::cout << "Write transformed marker to: " << solutionPointsFilename << std::endl;
+
 	//// mesh
 	if (useSourceMesh)
 	{
 		vtkStdString solutionMeshFilename = Utility::GetBaseFilename(sourceMeshFilename.c_str());
-		solutionMeshFilename += "_transformed.ply";
+		solutionMeshFilename += FILENAME_POSTFIX;
+		solutionMeshFilename += ".ply";
 
 		auto solutionMeshWriter = vtkSmartPointer<vtkPLYWriter>::New();
 		solutionMeshWriter->SetFileName(solutionMeshFilename.c_str());
 		solutionMeshWriter->SetInputData(solutionMesh);
 		solutionMeshWriter->Update();
 		solutionMeshWriter->Write();
-	}
 
+		std::cout << "Write transformed model to: " << solutionMeshFilename << std::endl;
+	}
 
 	// Visualization
 	std::vector< vtkSmartPointer<vtkRenderWindowInteractor> > interactors;
-	interactors.push_back( VisualizeMarker(source, target, solution) );
+	//interactors.push_back( VisualizeMarker(source, target, solution) );
 	if (useTargetMesh)
 	{
 		//interactors.push_back(VisualizeMesh(sourceMesh, targetMesh, solutionMesh));
@@ -404,7 +408,5 @@ int main(int argc, char* argv[])
 		interactors.push_back(Visualize(source, target, solution, sourceMesh, targetMesh, solutionMesh));
 	}
 	interactors.back()->Start();
-
-
 	return EXIT_SUCCESS;
 }

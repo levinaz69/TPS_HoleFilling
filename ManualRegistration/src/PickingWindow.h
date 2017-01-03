@@ -75,6 +75,7 @@ public:
 	void SelectPrevMarker();
 	void SelectNextMarker();
 	void SelectMarker(long index);
+	void SelectMarker(vtkSmartPointer<vtkActor> actor);
 	void SetCurrentMarker(long index);
 	void SetCurrentMarker(vtkSmartPointer<vtkActor> actor);
 	void MoveCurrentMarker(double x, double y, double z);
