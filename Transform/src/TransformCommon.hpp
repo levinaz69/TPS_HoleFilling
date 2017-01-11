@@ -345,6 +345,10 @@ int Main(int argc, char* argv[])
 		sourceMeshReader->SetFileName(sourceMeshFilename.c_str());
 		sourceMeshReader->Update();
 		sourceMesh = sourceMeshReader->GetOutput();
+#if !SHOW_COLOR
+		// clean up color information
+		if (auto colorArray = sourceMesh->GetPointData()->GetScalars()) colorArray->Reset();
+#endif //SHOW_COLOR
 	}
 
 	if (useTargetMesh)
@@ -353,13 +357,11 @@ int Main(int argc, char* argv[])
 		targetMeshReader->SetFileName(targetMeshFilename.c_str());
 		targetMeshReader->Update();
 		targetMesh = targetMeshReader->GetOutput();
-	}
-
 #if !SHOW_COLOR
-	// clean up color information
-	if (auto colorArray = sourceMesh->GetPointData()->GetScalars()) colorArray->Reset();
-	if (auto colorArray = targetMesh->GetPointData()->GetScalars()) colorArray->Reset();
+		// clean up color information
+		if (auto colorArray = targetMesh->GetPointData()->GetScalars()) colorArray->Reset();
 #endif //SHOW_COLOR
+	}
 
 	// Calculate Transform
 	auto transform = CalcTransform(sourcePoints, targetPoints);
@@ -407,6 +409,6 @@ int Main(int argc, char* argv[])
 		interactors.clear();
 		interactors.push_back(Visualize(source, target, solution, sourceMesh, targetMesh, solutionMesh));
 	}
-	interactors.back()->Start();
+	if (!interactors.empty()) interactors.back()->Start();
 	return EXIT_SUCCESS;
 }
