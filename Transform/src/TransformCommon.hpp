@@ -394,6 +394,7 @@ int Main(int argc, char* argv[])
 		auto solutionMeshWriter = vtkSmartPointer<vtkPLYWriter>::New();
 		solutionMeshWriter->SetFileName(solutionMeshFilename.c_str());
 		solutionMeshWriter->SetInputData(solutionMesh);
+		solutionMeshWriter->SetFileTypeToASCII();
 		solutionMeshWriter->Update();
 		solutionMeshWriter->Write();
 

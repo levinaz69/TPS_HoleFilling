@@ -1,3 +1,7 @@
 Thin Plate Spline Based Hole Filling
-====================================
-under developing
+======
+
+*under development*
+
+* Manual Registration
+* Affine Transformation
