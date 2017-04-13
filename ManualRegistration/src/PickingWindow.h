@@ -4,6 +4,8 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <memory>
 #include <vector>
 #include <list>
@@ -33,6 +35,9 @@
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkPropPicker.h>
 #include <vtkProperty.h>
+#include <vtkPointPicker.h>
+#include <vtkVertexGlyphFilter.h>
+
 
 
 const long NULL_MARKER_INDEX = -1;
@@ -55,6 +60,8 @@ public:
 	~PickingWindow();
 
 	void Initialize();
+    void InitPicker();
+    void SetPickerMode(int mode); // 1 for point cloud picker, 0 for mesh picker
 	void SetModelFile(const std::string filename);
 	void SetMarkerFile(const std::string filename);
 	unsigned long LoadModelFile();
@@ -68,9 +75,9 @@ public:
 	void PickingCallback(const int* clickPos);
 	void SetOperaringMode(const OPERATING_MODE mode);
 	long GetMarkerIndex(vtkSmartPointer<vtkActor> actor);
-	void AppendMarker(double* pos);
+    void AppendMarker(double * pos, vtkIdType pointId);
 	void AppendMarker(vtkPoints* points);
-	void InsertMarker(long index, double* pos);
+    void InsertMarker(long index, double* pos, vtkIdType pointId);
 	void InsertMarker(long index, vtkPoints* points);
 	void SelectPrevMarker();
 	void SelectNextMarker();
@@ -91,8 +98,10 @@ public:
 
 protected:
 	// Basic
+    bool isPointCloudPicker;
 	std::string ModelFilename;
 	std::string MarkerFilename;
+    std::string MarkerIdxFilename;
 
 	// Model
 	vtkSmartPointer<vtkPolyDataMapper> ModelMapper;
@@ -106,6 +115,7 @@ protected:
 	long CurrentMarkerIndex;
 	std::vector< vtkSmartPointer<vtkActor> > MarkerActors;
 	vtkSmartPointer<vtkActorCollection> MarkerActorCollection;	// contains same actors, possibly in different order
+    std::vector<vtkIdType> MarkerIndices;
 
 	// Render
 	vtkSmartPointer<vtkRenderer> Renderer;

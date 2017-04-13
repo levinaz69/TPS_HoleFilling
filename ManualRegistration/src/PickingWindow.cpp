@@ -73,12 +73,39 @@ void PickingWindow::Initialize()
 	RenderWindow->SetWindowName(oss.str().c_str());
 }
 
+void PickingWindow::InitPicker()
+{
+    if (isPointCloudPicker)
+    {
+        auto point_picker = vtkSmartPointer<vtkPointPicker>::New();
+        point_picker->SetTolerance(point_picker->GetTolerance() * 2);
+        point_picker->InitializePickList();
+        ModelActorCollection->InitTraversal();
+        vtkActor* actor;
+        while (actor = ModelActorCollection->GetNextActor())
+        {
+            point_picker->AddPickList(actor);
+        }
+        point_picker->PickFromListOn();
+        RenderWindowInteractor->SetPicker(point_picker);
+    }
+}
+
+void PickingWindow::SetPickerMode(int mode)
+{
+    if (mode == 1)
+        isPointCloudPicker = true;
+    else
+        isPointCloudPicker = false;
+}
+
 void PickingWindow::SetModelFile(const std::string filename)
 {
 	ModelFilename = filename;
 	// Auto-generate marker filename
 	auto baseFilename = Utility::GetBaseFilename(ModelFilename.c_str());
 	MarkerFilename = baseFilename + "_markers.xyz";
+    MarkerIdxFilename = baseFilename + "_markers.idx";
 }
 void PickingWindow::SetMarkerFile(const std::string filename)
 {
@@ -97,7 +124,17 @@ unsigned long PickingWindow::LoadModelFile()
 	std::cout << WindowID << " Load model file: " << ModelFilename << std::endl;
 //#endif
 
-	ModelMapper->SetInputConnection(plyReader->GetOutputPort());
+    if (isPointCloudPicker)
+    {
+        auto filter = vtkSmartPointer<vtkVertexGlyphFilter>::New();
+        filter->SetInputConnection(plyReader->GetOutputPort());
+        ModelMapper->SetInputConnection(filter->GetOutputPort());
+    }
+    else
+    {
+        ModelMapper->SetInputConnection(plyReader->GetOutputPort());
+    }
+
 	ModelActor->SetMapper(ModelMapper);
 	ModelActorCollection->AddItem(ModelActor);
 	Renderer->AddActor(ModelActor);
@@ -159,6 +196,23 @@ void PickingWindow::WriteMarkerFile()
 
 	std::cout << WindowID << " Write marker file: " << MarkerFilename << std::endl;
 
+//// ADD BEGIN
+//    if (isPointCloudPicker)
+//    {
+//        auto out = std::ofstream(MarkerIdxFilename);
+//        if (!out.is_open())
+//        {
+//            std::cout << WindowID << "Error: cannot open marker index file: " << MarkerFilename << std::endl;
+//            return;
+//        }
+//        for (auto index: MarkerIndices)
+//        {
+//            out << index << std::endl;
+//        }
+//        out.close();
+//        std::cout << WindowID << " Write marker index file: " << MarkerFilename << std::endl;
+//    }
+//// ADD END
 }
 
 void PickingWindow::Render()
@@ -225,14 +279,28 @@ void PickingWindow::AdjustMarkerSize(int step)
 
 void PickingWindow::PickingCallback(const int* clickPos)
 {
-	// Pick from this location.
+    // Pick from this location.
 
-	auto picker = vtkSmartPointer<vtkPropPicker>::New();
-	picker->PickProp(clickPos[0], clickPos[1], Renderer, 
-		OperatingMode == SELECT_MODE ? MarkerActorCollection : ModelActorCollection);
+    auto picker = vtkSmartPointer<vtkPropPicker>::New();
+    picker->PickProp(clickPos[0], clickPos[1], Renderer,
+        OperatingMode == SELECT_MODE ? MarkerActorCollection : ModelActorCollection);
 
-	double* picked_pos = picker->GetPickPosition();
-	vtkActor* picked_actor = picker->GetActor();
+    double* picked_pos = picker->GetPickPosition();
+    vtkActor* picked_actor = picker->GetActor();
+
+    vtkIdType picked_pointId = -1;  // default: nothing was picked
+
+    if (isPointCloudPicker && 
+         (OperatingMode == APPEND_MODE || 
+          OperatingMode == INSERT_MODE || 
+          OperatingMode == MOVE_MODE) )
+    {
+        auto point_picker = vtkPointPicker::SafeDownCast(RenderWindowInteractor->GetPicker());
+        point_picker->Pick(clickPos[0], clickPos[1], 0.0, Renderer);
+        picked_pos = point_picker->GetPickPosition();
+        picked_actor = point_picker->GetActor();
+        picked_pointId = point_picker->GetPointId();
+    }
 
 #ifdef _DEBUG
 	std::cout << WindowID <<" Pick position (world coordinates) is: "
@@ -243,6 +311,8 @@ void PickingWindow::PickingCallback(const int* clickPos)
 #if _DEBUG
 	std::cout << WindowID << " Current mode:" << OperatingMode << std::endl;
 #endif
+
+
 	if (picked_actor != nullptr)
 	{
 		if (OperatingMode == SELECT_MODE)
@@ -253,11 +323,11 @@ void PickingWindow::PickingCallback(const int* clickPos)
 		}
 		else if (OperatingMode == APPEND_MODE)
 		{
-			AppendMarker(picked_pos);
+			AppendMarker(picked_pos, picked_pointId);
 		}
 		else if (OperatingMode == INSERT_MODE)
 		{
-			InsertMarker(CurrentMarkerIndex, picked_pos);
+			InsertMarker(CurrentMarkerIndex, picked_pos, picked_pointId);
 		}
 		else if (OperatingMode == MOVE_MODE)
 		{
@@ -315,9 +385,9 @@ long PickingWindow::GetMarkerIndex(const vtkSmartPointer<vtkActor> actor)
 }
 
 
-void PickingWindow::AppendMarker(double* pos)
+void PickingWindow::AppendMarker(double* pos, vtkIdType pointId = -1)
 {
-	InsertMarker(NULL_MARKER_INDEX, pos);	// append
+	InsertMarker(NULL_MARKER_INDEX, pos, pointId);	// append
 }
 
 void PickingWindow::AppendMarker(vtkPoints* points)
@@ -325,19 +395,24 @@ void PickingWindow::AppendMarker(vtkPoints* points)
 	InsertMarker(NULL_MARKER_INDEX, points);	// append
 }
 
-void PickingWindow::InsertMarker(long index, double* pos)
+void PickingWindow::InsertMarker(long index, double* pos, vtkIdType pointId = -1)
 {
 	assert(index >= NULL_MARKER_INDEX && index <= (long)MarkerActors.size());
 	if (index == NULL_MARKER_INDEX)		// Append
 		index = MarkerActors.size();
 
+
 	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
 	actor->SetMapper(MarkerSphereMapper);
 	actor->SetPosition(pos[0], pos[1], pos[2]);
 
-	//Add actor to list
+	
 	if (CurrentMarkerIndex >= index)
 		CurrentMarkerIndex = index + 1;		// previous marker
+    //Add point index to list
+    if (isPointCloudPicker) 
+        MarkerIndices.insert(MarkerIndices.begin() + index, pointId);
+    //Add actor to list
 	MarkerActors.insert(MarkerActors.begin() + index, actor);
 	SetCurrentMarker(index);
 	MarkerActorCollection->AddItem(actor);
@@ -486,6 +561,8 @@ void PickingWindow::RemoveCurrentMarker()
 		MarkerActorCollection->RemoveItem(currentMarkerActor);
 		Renderer->RemoveActor(currentMarkerActor);
 
+        if (isPointCloudPicker)
+            MarkerIndices.erase(MarkerIndices.begin() + CurrentMarkerIndex);
 		auto nextActorIter = MarkerActors.erase(MarkerActors.begin() + CurrentMarkerIndex);
 
 #ifdef _DEBUG

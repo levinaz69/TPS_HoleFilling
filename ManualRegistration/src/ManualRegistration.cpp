@@ -16,16 +16,19 @@ int main(int argc, char *argv[])
 	auto meshWindow2 = std::make_shared<PickingWindow>();
 
 	meshWindow1->Initialize();
+    meshWindow1->SetPickerMode(1);
 	meshWindow1->SetModelFile(inputFilename1);
 	meshWindow1->LoadModelFile();
 	meshWindow1->LoadMarkerFile();
+    meshWindow1->InitPicker();
 	meshWindow1->Render();
 
 	meshWindow2->Initialize();
+    meshWindow2->SetPickerMode(1);
 	meshWindow2->SetModelFile(inputFilename2);
 	meshWindow2->LoadModelFile();
 	meshWindow2->LoadMarkerFile();
-
+    meshWindow2->InitPicker();
 	meshWindow2->Render();
 
 	std::vector<vtkRenderWindowInteractor*> interactors;
